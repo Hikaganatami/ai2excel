@@ -7,7 +7,7 @@ import re
 # --- PANEL AYARLARI ---
 st.set_page_config(page_title="UltraData AI", page_icon="🤖", layout="wide")
 
-# Tasarım (CSS)
+# Tasarım (CSS) - Görünürlük sorununu kökten çözen stil
 st.markdown("""
     <style>
     .stApp { background-color: #f0f2f6; }
@@ -17,43 +17,47 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# AI Motoru
+# AI Motoru Yapılandırması
 def get_engine():
     try:
-        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-        return genai.GenerativeModel('gemini-1.5-flash')
-    except:
+        api_key = st.secrets["GEMINI_API_KEY"]
+        genai.configure(api_key=api_key)
+        # Model ismini en güncel "flash" sürümüne çektik
+        return genai.GenerativeModel('gemini-1.5-flash-latest')
+    except Exception as e:
+        st.error(f"Bağlantı Ayarı Hatası: {str(e)}")
         return None
 
 ai_engine = get_engine()
 
 # Arayüz
 st.title("🤖 UltraData AI: Akıllı Analist")
-st.write("Senaryonuzu yazın, profesyonel Excel raporunuzu saniyeler içinde alın.")
+st.write("Verilerinizi profesyonel Excel raporlarına dönüştürün.")
 
-user_query = st.text_area("İşlem yapılacak metni veya senaryoyu girin:", height=200, placeholder="Örn: 270 günlük kar maliyet tablosu yap...")
+user_query = st.text_area("İşlem yapılacak metni girin:", height=200, placeholder="Örn: 10 günlük kar tablosu yap...")
 
 if st.button("Analiz Et ve Raporu Başlat ✨"):
     if user_query and ai_engine:
-        with st.spinner('Yapay zeka verileri hesaplıyor...'):
+        with st.spinner('Yapay zeka modelleriyle bağlantı kuruluyor...'):
             try:
-                # Geliştirilmiş Prompt
-                prompt = f"Sen bir veri analistisin. Verilen senaryoyu analiz et ve sonucu SADECE CSV formatında döndür. Ek açıklama yapma: {user_query}"
-                response = ai_engine.generate_content(prompt)
+                # Prompt (Talimat)
+                prompt = f"Sen bir veri analistisin. Verilen metni analiz et ve sonucu SADECE CSV formatında döndür. Ek açıklama yapma: {user_query}"
                 
-                # Temizleme ve Tablo Oluşturma
+                # İçerik Üretimi
+                response = ai_engine.generate_content(prompt)
                 text = response.text
+                
+                # CSV Verisini Ayıklama (Regex)
                 csv_match = re.search(r'((?:[^,]+,)+[^,\n]+\n(?:[^,]+,)+[^,\n]+)', text, re.DOTALL)
                 
                 if csv_match:
-                    # BURASI DÜZELTİLDİ: Parantezler tek tek kapatıldı.
                     clean_data = csv_match.group(0).strip()
                     df = pd.read_csv(io.StringIO(clean_data))
                     
-                    st.success("✅ Veri Başarıyla Çözümlendi!")
+                    st.success("✅ Veri Hazır!")
                     st.dataframe(df, use_container_width=True)
                     
-                    # Excel Çıktısı
+                    # Excel Çıktısı (XlsxWriter motoru ile)
                     excel_buffer = io.BytesIO()
                     with pd.ExcelWriter(excel_buffer, engine='xlsxwriter') as writer:
                         df.to_excel(writer, index=False)
@@ -65,9 +69,9 @@ if st.button("Analiz Et ve Raporu Başlat ✨"):
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     )
                 else:
-                    st.error("AI tablo formatı oluşturamadı. Lütfen senaryoyu daha net yazın.")
+                    st.error("AI veriyi tabloya dönüştüremedi. Lütfen daha basit bir veriyle deneyin.")
             except Exception as e:
-                st.error(f"Hata oluştu: {str(e)}")
+                st.error(f"Sistem Hatası: {str(e)}")
     else:
         st.warning("Lütfen bir giriş yapın.")
 
