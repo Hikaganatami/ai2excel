@@ -4,71 +4,132 @@ import google.generativeai as genai
 import io
 import re
 
-# --- PANEL AYARLARI ---
-st.set_page_config(page_title="UltraData AI", page_icon="🤖", layout="wide")
+# Page Config
+st.set_page_config(page_title="UltraData AI Premium", page_icon="💎", layout="wide")
 
+# Elite UI Design (Dark & Neon Theme)
 st.markdown("""
     <style>
-    .stApp { background-color: #f0f2f6; }
-    .stTextArea textarea { color: #1e1e1e !important; background-color: #ffffff !important; border: 2px solid #1a73e8 !important; border-radius: 10px !important; }
-    .stButton>button { width: 100%; background-color: #1a73e8 !important; color: white !important; font-weight: bold !important; height: 3.5em !important; border-radius: 10px !important; }
+    /* Ana Arka Plan */
+    .stApp {
+        background: radial-gradient(circle, #1a1a2e 0%, #16213e 100%);
+        color: #e94560;
+    }
+    
+    /* Üst Başlık Stili */
+    h1 {
+        font-family: 'Inter', sans-serif;
+        font-weight: 800;
+        letter-spacing: -1px;
+        color: #00d2ff !important;
+        text-shadow: 0px 0px 15px rgba(0, 210, 255, 0.4);
+    }
+
+    /* Input Alanı (Glassmorphism) */
+    .stTextArea textarea {
+        color: #ffffff !important;
+        background-color: rgba(255, 255, 255, 0.05) !important;
+        border: 1px solid rgba(0, 210, 255, 0.3) !important;
+        border-radius: 15px !important;
+        font-size: 16px !important;
+        backdrop-filter: blur(10px);
+        selection-background-color: #00d2ff;
+    }
+
+    /* Buton Tasarımı */
+    .stButton>button {
+        width: 100%;
+        background: linear-gradient(90deg, #00d2ff 0%, #3a7bd5 100%) !important;
+        color: white !important;
+        font-weight: 700 !important;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        border: none !important;
+        border-radius: 12px !important;
+        padding: 15px !important;
+        transition: all 0.3s ease-in-out !important;
+    }
+
+    .stButton>button:hover {
+        transform: translateY(-3px);
+        box-shadow: 0px 10px 20px rgba(0, 210, 255, 0.4);
+    }
+
+    /* Analiz Yazıları ve Spinner */
+    .stSpinner > div > div {
+        border-top-color: #00d2ff !important;
+    }
+    
+    div[data-testid="stMarkdownContainer"] p {
+        color: #ffffff !important;
+        opacity: 0.9;
+    }
+
+    /* Tablo Görünümü */
+    [data-testid="stDataFrame"] {
+        background-color: rgba(255, 255, 255, 0.02);
+        border-radius: 15px;
+        padding: 10px;
+    }
+    
+    /* Başarı Mesajı */
+    .stAlert {
+        background-color: rgba(0, 210, 255, 0.1) !important;
+        color: #00d2ff !important;
+        border: 1px solid #00d2ff !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# --- MODEL SEÇİCİ ---
-def get_working_model():
+def initialize_engine():
     try:
-        api_key = st.secrets["GEMINI_API_KEY"]
-        genai.configure(api_key=api_key)
+        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
         models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        preferred = ['models/gemini-1.5-flash', 'models/gemini-1.5-pro', 'models/gemini-1.0-pro']
-        for p in preferred:
+        priority = ['models/gemini-1.5-flash', 'models/gemini-1.5-pro']
+        for p in priority:
             if p in models: return genai.GenerativeModel(p)
         return genai.GenerativeModel(models[0]) if models else None
     except: return None
 
-ai_engine = get_working_model()
+engine = initialize_engine()
 
-# --- ARAYÜZ ---
-st.title("🤖 UltraData AI: Akıllı Analist")
-user_query = st.text_area("İşlem yapılacak metni girin:", height=200, placeholder="Örn: 10 günlük kar tablosu yap...")
+# UI Layout
+st.title("💎 UltraData AI Premium")
+st.markdown("##### Next-generation financial analysis and data conversion framework.")
 
-if st.button("Analiz Et ve Raporu Başlat ✨"):
-    if user_query and ai_engine:
-        with st.spinner('Analiz ediliyor...'):
+query = st.text_area("", height=250, placeholder="Paste your data or scenario here. Example: '270-day profit analysis with 82% inflation...'")
+
+if st.button("EXECUTE ANALYSIS"):
+    if query and engine:
+        with st.spinner('Synchronizing with AI Neural Network...'):
             try:
-                # Prompt: AI'ya CSV yapısını bozmaması için kesin talimat veriyoruz
-                prompt = f"Verilen metni analiz et. Sonucu sadece virgülle ayrılmış (CSV) tablo olarak ver. Sütun sayısı her satırda aynı olsun. Ek açıklama yapma. Senaryo: {user_query}"
-                response = ai_engine.generate_content(prompt)
+                instruction = "Act as a senior data analyst. Process the following data and return ONLY a valid CSV. No conversational text."
+                response = engine.generate_content(f"{instruction}\n\nData: {query}")
                 
-                # Temizleme
-                text = response.text
-                clean_text = re.sub(r'```csv\n|```', '', text).strip()
+                output = response.text
+                clean_csv = re.sub(r'```csv\n|```', '', output).strip()
                 
-                # HATA ÇÖZÜCÜ OKUMA: Eğer standart okuma hata verirse, boşluklara göre böl
                 try:
-                    df = pd.read_csv(io.StringIO(clean_text), sep=None, engine='python', on_bad_lines='skip')
+                    df = pd.read_csv(io.StringIO(clean_csv), sep=None, engine='python', on_bad_lines='skip')
                 except:
-                    # En kötü durumda veriyi satır satır bölüp zorla tablo yap
-                    lines = [l.split(',') for l in clean_text.split('\n') if ',' in l]
+                    lines = [l.split(',') for l in clean_csv.split('\n') if ',' in l]
                     df = pd.DataFrame(lines[1:], columns=lines[0])
 
                 if not df.empty:
-                    st.success("✅ İşlem Başarılı!")
+                    st.success("COMPUTATION SUCCESSFUL")
                     st.dataframe(df, use_container_width=True)
                     
-                    excel_buffer = io.BytesIO()
-                    with pd.ExcelWriter(excel_buffer, engine='xlsxwriter') as writer:
+                    buf = io.BytesIO()
+                    with pd.ExcelWriter(buf, engine='xlsxwriter') as writer:
                         df.to_excel(writer, index=False)
                     
-                    st.download_button("📥 Excel İndir", data=excel_buffer.getvalue(), file_name="analiz.xlsx")
+                    st.download_button("EXPORT TO EXCEL (.XLSX)", data=buf.getvalue(), file_name="ai_analysis_report.xlsx")
                 else:
-                    st.error("Veri tabloya dönüştürülemedi.")
-                
+                    st.error("Engine failed to parse the data structure.")
             except Exception as e:
-                st.error(f"İşlem Hatası: {str(e)}")
+                st.error(f"System Error: {str(e)}")
     else:
-        st.warning("Lütfen giriş yapın.")
+        st.warning("Action required: Please provide input data.")
 
 st.markdown("---")
-st.caption("© 2026 Hikaganatami AI Solutions")
+st.caption("Hikaganatami AI Framework | Licensed under MIT | v3.0 Premium Edition")
